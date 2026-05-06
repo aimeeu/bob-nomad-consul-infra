@@ -1,0 +1,48 @@
+---
+# Consul version and installation
+consul_version: "1.17.0"
+consul_architecture: "amd64"
+consul_download_url: "https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{ consul_version }}_linux_{{ consul_architecture }}.zip"
+
+# Consul directories
+consul_bin_path: "/usr/local/bin/consul"
+consul_config_dir: "/etc/consul.d"
+consul_data_dir: "/opt/consul"
+
+# Consul user and group
+consul_user: "consul"
+consul_group: "consul"
+
+# Consul configuration
+consul_datacenter: "dc1"
+consul_domain: "consul"
+consul_log_level: "INFO"
+consul_enable_script_checks: false
+consul_enable_local_script_checks: true
+
+# Consul encryption
+consul_encrypt_enable: true
+# This will be generated during playbook execution if not provided
+consul_encrypt_key: ""
+
+# Consul ACL
+consul_acl_enabled: true
+consul_acl_default_policy: "deny"
+consul_acl_down_policy: "extend-cache"
+
+# Consul UI
+consul_ui_enabled: true
+
+# Consul ports
+consul_port_dns: 8600
+consul_port_http: 8500
+consul_port_https: -1
+consul_port_grpc: 8502
+consul_port_serf_lan: 8301
+consul_port_serf_wan: 8302
+consul_port_server: 8300
+
+# Consul performance
+consul_raft_multiplier: 1
+
+# Made with Bob

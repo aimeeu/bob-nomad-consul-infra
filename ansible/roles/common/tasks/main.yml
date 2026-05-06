@@ -1,0 +1,35 @@
+---
+- name: Update apt cache
+  become: true
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install common packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Disable systemd-resolved to avoid port conflicts with Consul
+  become: true
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: stopped
+    enabled: no
+
+- name: Configure DNS to use 8.8.8.8
+  become: true
+  ansible.builtin.copy:
+    content: |
+      nameserver 8.8.8.8
+      nameserver 8.8.4.4
+    dest: /etc/resolv.conf
+    mode: '0644'
+
+- name: Set timezone to UTC
+  become: true
+  community.general.timezone:
+    name: UTC
+
+# Made with Bob

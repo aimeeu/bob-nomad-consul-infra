@@ -1,0 +1,48 @@
+datacenter = "{{ consul_datacenter }}"
+data_dir = "{{ consul_data_dir }}"
+log_level = "{{ consul_log_level }}"
+
+server = true
+bootstrap_expect = {{ groups['servers'] | length }}
+
+bind_addr = "{{ ansible_default_ipv4.address }}"
+client_addr = "0.0.0.0"
+
+ui_config {
+  enabled = {{ consul_ui_enabled | lower }}
+}
+
+{% if consul_encrypt_enable and consul_encrypt_key != "" %}
+encrypt = "{{ consul_encrypt_key }}"
+{% endif %}
+
+retry_join = [
+{% for host in groups['servers'] %}
+  "{{ hostvars[host]['private_ip'] }}"{{ "," if not loop.last else "" }}
+{% endfor %}
+]
+
+acl {
+  enabled = {{ consul_acl_enabled | lower }}
+  default_policy = "{{ consul_acl_default_policy }}"
+  down_policy = "{{ consul_acl_down_policy }}"
+  enable_token_persistence = true
+}
+
+performance {
+  raft_multiplier = {{ consul_raft_multiplier }}
+}
+
+ports {
+  dns = {{ consul_port_dns }}
+  http = {{ consul_port_http }}
+  https = {{ consul_port_https }}
+  grpc = {{ consul_port_grpc }}
+  serf_lan = {{ consul_port_serf_lan }}
+  serf_wan = {{ consul_port_serf_wan }}
+  server = {{ consul_port_server }}
+}
+
+connect {
+  enabled = true
+}

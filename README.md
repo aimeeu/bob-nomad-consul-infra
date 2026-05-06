@@ -1,0 +1,378 @@
+# Nomad and Consul Infrastructure on AWS
+
+This repository contains Terraform configurations and Ansible playbooks to deploy a HashiCorp Nomad and Consul cluster on AWS infrastructure.
+
+## Overview
+
+This infrastructure creates:
+- AWS VPC with public subnet
+- Security groups configured for Nomad and Consul
+- EC2 instances for Nomad/Consul servers (default: 3)
+- EC2 instances for Nomad clients (default: 2)
+- Automated configuration using Ansible
+
+## Architecture
+
+- **Consul**: Provides service discovery, health checking, and key-value storage
+- **Nomad**: Orchestrates containerized and non-containerized workloads
+- **Integration**: Nomad uses Consul for service discovery and health checks
+
+## Prerequisites
+
+- AWS account with appropriate credentials configured
+- Terraform >= 1.0
+- Ansible >= 2.9
+- SSH key pair (`~/.ssh/id_rsa` and `~/.ssh/id_rsa.pub`)
+- Python 3.x
+
+## Quick Start
+
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd bob-nomad-consul-infra
+```
+
+### 2. Configure Terraform Variables
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your settings:
+
+```hcl
+aws_region       = "us-east-1"
+project_name     = "nomad-consul"
+owner            = "your-name"
+server_count     = 3
+client_count     = 2
+allowed_ssh_cidr = "YOUR_IP/32"  # Replace with your IP
+```
+
+### 3. Deploy Infrastructure
+
+```bash
+# Initialize Terraform
+terraform init
+
+# Review the plan
+terraform plan
+
+# Apply the configuration
+terraform apply
+```
+
+Terraform will:
+- Create AWS networking resources (VPC, subnet, security groups)
+- Launch EC2 instances
+- Generate Ansible inventory file at `../ansible/inventory.ini`
+
+### 4. Configure with Ansible
+
+```bash
+cd ../ansible
+
+# Install required Ansible collections
+ansible-galaxy collection install community.general
+ansible-galaxy collection install ansible.posix
+
+# Run the playbook
+ansible-playbook -i inventory.ini site.yml
+```
+
+The playbook will:
+1. Configure Ubuntu and install common packages
+2. Install and configure Consul (servers and clients)
+3. Install and configure Nomad (servers and clients)
+4. Integrate Nomad with Consul
+
+### 5. Access the UIs
+
+After deployment, you can access:
+
+**Consul UI:**
+```bash
+# Get server IPs from Terraform output
+terraform output consul_ui_urls
+```
+
+**Nomad UI:**
+```bash
+# Get server IPs from Terraform output
+terraform output nomad_ui_urls
+```
+
+Default ports:
+- Consul UI: `http://<server-ip>:8500`
+- Nomad UI: `http://<server-ip>:4646`
+
+## Configuration Details
+
+### Terraform Configuration
+
+**Network Resources:**
+- VPC CIDR: `10.0.0.0/16`
+- Subnet CIDR: `10.0.1.0/24`
+- Security groups with ports for Consul and Nomad
+
+**Compute Resources:**
+- Ubuntu 22.04 LTS AMI
+- Default instance type: `t3.medium`
+- Root volume: 50GB gp3
+
+### Ansible Roles
+
+**Common Role:**
+- Updates system packages
+- Installs common utilities
+- Configures DNS settings
+- Disables systemd-resolved
+
+**Consul Role:**
+- Installs Consul binary
+- Configures server/client mode
+- Enables encryption and ACLs
+- Sets up systemd service
+
+**Nomad Role:**
+- Installs Nomad binary
+- Configures server/client mode
+- Installs CNI plugins for networking
+- Enables Docker driver
+- Integrates with Consul
+- Sets up systemd service
+
+## Post-Deployment
+
+### Bootstrap ACL Tokens
+
+After deployment, bootstrap tokens are saved locally:
+
+```bash
+# Consul bootstrap token
+cat /tmp/consul_bootstrap_token.txt
+
+# Nomad bootstrap token
+cat /tmp/nomad_bootstrap_token.txt
+```
+
+**Important:** Save these tokens securely. They provide full administrative access.
+
+### Verify Cluster Status
+
+**Consul:**
+```bash
+# SSH to a server
+ssh ubuntu@<server-ip>
+
+# Check cluster members
+consul members
+
+# Check cluster health
+consul operator raft list-peers
+```
+
+**Nomad:**
+```bash
+# Check server status
+nomad server members
+
+# Check node status
+nomad node status
+
+# Check job status
+nomad status
+```
+
+### Deploy a Test Job
+
+Create a simple job file `example.nomad`:
+
+```hcl
+job "example" {
+  datacenters = ["dc1"]
+  type        = "service"
+
+  group "web" {
+    count = 3
+
+    task "nginx" {
+      driver = "docker"
+
+      config {
+        image = "nginx:latest"
+        ports = ["http"]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 128
+      }
+
+      service {
+        name = "nginx"
+        port = "http"
+        
+        check {
+          type     = "http"
+          path     = "/"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+    }
+
+    network {
+      port "http" {
+        to = 80
+      }
+    }
+  }
+}
+```
+
+Deploy the job:
+```bash
+nomad job run example.nomad
+```
+
+## Maintenance
+
+### Scaling
+
+To add more servers or clients:
+
+1. Update `terraform.tfvars`:
+```hcl
+server_count = 5  # Increase from 3
+client_count = 4  # Increase from 2
+```
+
+2. Apply changes:
+```bash
+cd terraform
+terraform apply
+```
+
+3. Run Ansible to configure new instances:
+```bash
+cd ../ansible
+ansible-playbook -i inventory.ini site.yml
+```
+
+### Upgrading Versions
+
+To upgrade Consul or Nomad:
+
+1. Update version in Ansible defaults:
+   - `ansible/roles/consul/defaults/main.yml`
+   - `ansible/roles/nomad/defaults/main.yml`
+
+2. Run Ansible playbook:
+```bash
+cd ansible
+ansible-playbook -i inventory.ini site.yml
+```
+
+## Cleanup
+
+To destroy all resources:
+
+```bash
+cd terraform
+terraform destroy
+```
+
+## Security Considerations
+
+1. **SSH Access**: Restrict `allowed_ssh_cidr` to your IP address
+2. **ACL Tokens**: Store bootstrap tokens securely
+3. **Encryption**: Consul gossip encryption is enabled by default
+4. **TLS**: Consider enabling TLS for production deployments
+5. **Network**: Deploy in private subnets with bastion host for production
+
+## Troubleshooting
+
+### Consul Issues
+
+```bash
+# Check Consul logs
+sudo journalctl -u consul -f
+
+# Verify Consul configuration
+consul validate /etc/consul.d/consul.hcl
+
+# Check Consul members
+consul members
+```
+
+### Nomad Issues
+
+```bash
+# Check Nomad logs
+sudo journalctl -u nomad -f
+
+# Verify Nomad configuration
+nomad config validate /etc/nomad.d/nomad.hcl
+
+# Check Nomad status
+nomad node status
+nomad server members
+```
+
+### Connectivity Issues
+
+```bash
+# Test Consul connectivity
+curl http://localhost:8500/v1/status/leader
+
+# Test Nomad connectivity
+curl http://localhost:4646/v1/status/leader
+
+# Check security group rules
+# Ensure ports 8300-8302, 8500, 8600 (Consul) and 4646-4648 (Nomad) are open
+```
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                         AWS VPC                          │
+│                      10.0.0.0/16                         │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │              Public Subnet 10.0.1.0/24             │ │
+│  │                                                    │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────┐│ │
+│  │  │   Server 1   │  │   Server 2   │  │ Server 3 ││ │
+│  │  │ Consul+Nomad │  │ Consul+Nomad │  │Consul+Nomad││
+│  │  └──────────────┘  └──────────────┘  └──────────┘│ │
+│  │                                                    │ │
+│  │  ┌──────────────┐  ┌──────────────┐              │ │
+│  │  │   Client 1   │  │   Client 2   │              │ │
+│  │  │Consul+Nomad  │  │Consul+Nomad  │              │ │
+│  │  │   +Docker    │  │   +Docker    │              │ │
+│  │  └──────────────┘  └──────────────┘              │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  Internet Gateway                                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+## References
+
+- [HashiCorp Consul Documentation](https://www.consul.io/docs)
+- [HashiCorp Nomad Documentation](https://www.nomadproject.io/docs)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+- [Ansible Documentation](https://docs.ansible.com/)
+
+## License
+
+This project is provided as-is for educational and demonstration purposes.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.

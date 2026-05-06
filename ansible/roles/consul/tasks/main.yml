@@ -1,0 +1,143 @@
+---
+- name: Create consul group
+  become: true
+  ansible.builtin.group:
+    name: "{{ consul_group }}"
+    state: present
+
+- name: Create consul user
+  become: true
+  ansible.builtin.user:
+    name: "{{ consul_user }}"
+    group: "{{ consul_group }}"
+    system: yes
+    shell: /bin/false
+    home: "{{ consul_config_dir }}"
+    createhome: no
+
+- name: Create consul directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ consul_user }}"
+    group: "{{ consul_group }}"
+    mode: '0755'
+  loop:
+    - "{{ consul_config_dir }}"
+    - "{{ consul_data_dir }}"
+
+- name: Check if consul is already installed
+  ansible.builtin.stat:
+    path: "{{ consul_bin_path }}"
+  register: consul_binary
+
+- name: Download and install consul
+  when: not consul_binary.stat.exists
+  block:
+    - name: Download consul
+      become: true
+      ansible.builtin.get_url:
+        url: "{{ consul_download_url }}"
+        dest: "/tmp/consul.zip"
+        mode: '0644'
+
+    - name: Unzip consul
+      become: true
+      ansible.builtin.unarchive:
+        src: "/tmp/consul.zip"
+        dest: "/usr/local/bin"
+        remote_src: yes
+        mode: '0755'
+
+    - name: Remove consul zip file
+      become: true
+      ansible.builtin.file:
+        path: "/tmp/consul.zip"
+        state: absent
+
+- name: Generate consul encryption key
+  when: 
+    - consul_encrypt_enable
+    - consul_encrypt_key == ""
+    - inventory_hostname == groups['servers'][0]
+  block:
+    - name: Generate encryption key
+      ansible.builtin.command: "{{ consul_bin_path }} keygen"
+      register: consul_keygen_output
+      changed_when: false
+
+    - name: Set encryption key fact
+      ansible.builtin.set_fact:
+        consul_encrypt_key: "{{ consul_keygen_output.stdout }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['all'] }}"
+
+- name: Create consul server configuration
+  become: true
+  ansible.builtin.template:
+    src: consul-server.hcl.j2
+    dest: "{{ consul_config_dir }}/consul.hcl"
+    owner: "{{ consul_user }}"
+    group: "{{ consul_group }}"
+    mode: '0640'
+  when: inventory_hostname in groups['servers']
+  notify: restart consul
+
+- name: Create consul client configuration
+  become: true
+  ansible.builtin.template:
+    src: consul-client.hcl.j2
+    dest: "{{ consul_config_dir }}/consul.hcl"
+    owner: "{{ consul_user }}"
+    group: "{{ consul_group }}"
+    mode: '0640'
+  when: inventory_hostname in groups['clients']
+  notify: restart consul
+
+- name: Create consul systemd service
+  become: true
+  ansible.builtin.template:
+    src: consul.service.j2
+    dest: /etc/systemd/system/consul.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart consul
+
+- name: Enable and start consul service
+  become: true
+  ansible.builtin.systemd:
+    name: consul
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for consul to be ready
+  ansible.builtin.wait_for:
+    port: "{{ consul_port_http }}"
+    delay: 5
+    timeout: 60
+
+- name: Bootstrap ACL system
+  when:
+    - consul_acl_enabled
+    - inventory_hostname == groups['servers'][0]
+  block:
+    - name: Check if ACL is already bootstrapped
+      ansible.builtin.command: "{{ consul_bin_path }} acl bootstrap"
+      register: consul_acl_bootstrap
+      failed_when: false
+      changed_when: consul_acl_bootstrap.rc == 0
+
+    - name: Save bootstrap token
+      when: consul_acl_bootstrap.rc == 0
+      ansible.builtin.copy:
+        content: "{{ consul_acl_bootstrap.stdout }}"
+        dest: "/tmp/consul_bootstrap_token.txt"
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+# Made with Bob

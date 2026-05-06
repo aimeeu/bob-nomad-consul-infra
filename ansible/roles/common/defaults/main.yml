@@ -1,0 +1,15 @@
+---
+# Common role default variables
+common_packages:
+  - curl
+  - wget
+  - unzip
+  - jq
+  - git
+  - vim
+  - htop
+  - net-tools
+  - dnsutils
+  - software-properties-common
+
+# Made with Bob

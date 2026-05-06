@@ -1,0 +1,13 @@
+---
+- name: reload systemd
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: restart consul
+  become: true
+  ansible.builtin.systemd:
+    name: consul
+    state: restarted
+
+# Made with Bob

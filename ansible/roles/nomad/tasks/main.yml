@@ -1,0 +1,161 @@
+---
+- name: Create nomad directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ nomad_user }}"
+    group: "{{ nomad_group }}"
+    mode: '0755'
+  loop:
+    - "{{ nomad_config_dir }}"
+    - "{{ nomad_data_dir }}"
+    - "{{ nomad_plugin_dir }}"
+
+- name: Check if nomad is already installed
+  ansible.builtin.stat:
+    path: "{{ nomad_bin_path }}"
+  register: nomad_binary
+
+- name: Download and install nomad
+  when: not nomad_binary.stat.exists
+  block:
+    - name: Download nomad
+      become: true
+      ansible.builtin.get_url:
+        url: "{{ nomad_download_url }}"
+        dest: "/tmp/nomad.zip"
+        mode: '0644'
+
+    - name: Unzip nomad
+      become: true
+      ansible.builtin.unarchive:
+        src: "/tmp/nomad.zip"
+        dest: "/usr/local/bin"
+        remote_src: yes
+        mode: '0755'
+
+    - name: Remove nomad zip file
+      become: true
+      ansible.builtin.file:
+        path: "/tmp/nomad.zip"
+        state: absent
+
+- name: Install CNI plugins for networking
+  when: nomad_client_enabled
+  block:
+    - name: Create CNI bin directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ nomad_cni_bin_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Download CNI plugins
+      become: true
+      ansible.builtin.get_url:
+        url: "{{ nomad_cni_plugins_url }}"
+        dest: "/tmp/cni-plugins.tgz"
+        mode: '0644'
+
+    - name: Extract CNI plugins
+      become: true
+      ansible.builtin.unarchive:
+        src: "/tmp/cni-plugins.tgz"
+        dest: "{{ nomad_cni_bin_dir }}"
+        remote_src: yes
+
+    - name: Remove CNI plugins archive
+      become: true
+      ansible.builtin.file:
+        path: "/tmp/cni-plugins.tgz"
+        state: absent
+
+    - name: Enable bridge netfilter
+      become: true
+      ansible.builtin.modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Configure sysctl for bridge networking
+      become: true
+      ansible.posix.sysctl:
+        name: "{{ item }}"
+        value: '1'
+        state: present
+        reload: yes
+      loop:
+        - net.bridge.bridge-nf-call-arptables
+        - net.bridge.bridge-nf-call-ip6tables
+        - net.bridge.bridge-nf-call-iptables
+
+- name: Create nomad server configuration
+  become: true
+  ansible.builtin.template:
+    src: nomad-server.hcl.j2
+    dest: "{{ nomad_config_dir }}/nomad.hcl"
+    owner: "{{ nomad_user }}"
+    group: "{{ nomad_group }}"
+    mode: '0640'
+  when: nomad_server_enabled
+  notify: restart nomad
+
+- name: Create nomad client configuration
+  become: true
+  ansible.builtin.template:
+    src: nomad-client.hcl.j2
+    dest: "{{ nomad_config_dir }}/nomad.hcl"
+    owner: "{{ nomad_user }}"
+    group: "{{ nomad_group }}"
+    mode: '0640'
+  when: nomad_client_enabled
+  notify: restart nomad
+
+- name: Create nomad systemd service
+  become: true
+  ansible.builtin.template:
+    src: nomad.service.j2
+    dest: /etc/systemd/system/nomad.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart nomad
+
+- name: Enable and start nomad service
+  become: true
+  ansible.builtin.systemd:
+    name: nomad
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for nomad to be ready
+  ansible.builtin.wait_for:
+    port: 4646
+    delay: 5
+    timeout: 60
+
+- name: Bootstrap ACL system
+  when:
+    - nomad_acl_enabled
+    - nomad_server_enabled
+    - inventory_hostname == groups['servers'][0]
+  block:
+    - name: Check if ACL is already bootstrapped
+      ansible.builtin.command: "{{ nomad_bin_path }} acl bootstrap"
+      register: nomad_acl_bootstrap
+      failed_when: false
+      changed_when: nomad_acl_bootstrap.rc == 0
+      environment:
+        NOMAD_ADDR: "http://127.0.0.1:4646"
+
+    - name: Save bootstrap token
+      when: nomad_acl_bootstrap.rc == 0
+      ansible.builtin.copy:
+        content: "{{ nomad_acl_bootstrap.stdout }}"
+        dest: "/tmp/nomad_bootstrap_token.txt"
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+# Made with Bob

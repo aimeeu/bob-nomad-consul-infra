@@ -1,0 +1,13 @@
+---
+- name: reload systemd
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: restart nomad
+  become: true
+  ansible.builtin.systemd:
+    name: nomad
+    state: restarted
+
+# Made with Bob
