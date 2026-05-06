@@ -11,11 +11,15 @@ vpc_cidr         = "10.0.0.0/16"
 subnet_cidr      = "10.0.1.0/24"
 allowed_ssh_cidr = "0.0.0.0/0"  # Change this to your IP for better security
 
+# AMI Configuration
+ami_owner       = "099720109477"  # Canonical (Ubuntu)
+ami_name_filter = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+
 # Instance Configuration
-server_count          = 3
-client_count          = 2
-server_instance_type  = "t3.medium"
-client_instance_type  = "t3.medium"
+server_count         = 3
+client_count         = 2
+server_instance_type = "t3.medium"
+client_instance_type = "t3.medium"
 
 # SSH Configuration
 ssh_user = "ubuntu"
