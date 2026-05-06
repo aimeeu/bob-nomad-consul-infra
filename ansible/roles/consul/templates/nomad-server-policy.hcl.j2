@@ -1,0 +1,33 @@
+# Nomad Server Policy for Consul Integration
+# This policy allows Nomad servers to manage service registrations and perform service discovery
+
+# Allow Nomad servers to register services in Consul
+agent_prefix "" {
+  policy = "read"
+}
+
+# Allow Nomad servers to read and write services
+service_prefix "" {
+  policy = "write"
+}
+
+# Allow Nomad servers to read nodes
+node_prefix "" {
+  policy = "read"
+}
+
+# Allow Nomad servers to manage ACL tokens for workloads
+acl = "write"
+
+# Allow Nomad servers to read key-value store
+key_prefix "" {
+  policy = "read"
+}
+
+# Allow Nomad servers to manage prepared queries
+query_prefix "" {
+  policy = "write"
+}
+
+# Allow Nomad servers to manage intentions for service mesh
+operator = "write"

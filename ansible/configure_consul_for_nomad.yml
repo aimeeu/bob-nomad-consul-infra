@@ -1,0 +1,242 @@
+---
+- name: Configure Consul for Nomad Workload Identity
+  hosts: servers[0]
+  gather_facts: no
+  vars:
+    consul_token_file: "/tmp/consul_bootstrap_secret_id.txt"
+    nomad_server_token_file: "/tmp/nomad_server_consul_token.txt"
+    nomad_client_token_file: "/tmp/nomad_client_consul_token.txt"
+  
+  tasks:
+    - name: Check if bootstrap token file exists
+      ansible.builtin.stat:
+        path: "{{ consul_token_file }}"
+      register: token_file
+      delegate_to: localhost
+      become: false
+
+    - name: Fail if bootstrap token not found
+      ansible.builtin.fail:
+        msg: "Consul bootstrap token not found at {{ consul_token_file }}. Please run the main playbook first."
+      when: not token_file.stat.exists
+
+    - name: Read Consul bootstrap token
+      ansible.builtin.slurp:
+        src: "{{ consul_token_file }}"
+      register: consul_token_content
+      delegate_to: localhost
+      become: false
+
+    - name: Set Consul token fact
+      ansible.builtin.set_fact:
+        consul_bootstrap_token: "{{ consul_token_content.content | b64decode | trim }}"
+
+    # Configure Nomad Server Policy
+    - name: Copy Nomad server policy to remote host
+      ansible.builtin.template:
+        src: roles/consul/templates/nomad-server-policy.hcl.j2
+        dest: /tmp/nomad-server-policy.hcl
+        mode: '0644'
+
+    - name: Create Nomad server policy in Consul
+      ansible.builtin.command: >
+        consul acl policy create
+        -name nomad-server
+        -description "Policy for Nomad servers"
+        -rules @/tmp/nomad-server-policy.hcl
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: server_policy_result
+      failed_when: false
+      changed_when: server_policy_result.rc == 0
+
+    - name: Update Nomad server policy if it exists
+      when: server_policy_result.rc != 0 and 'already exists' in server_policy_result.stderr
+      ansible.builtin.command: >
+        consul acl policy update
+        -name nomad-server
+        -rules @/tmp/nomad-server-policy.hcl
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+
+    - name: Create Nomad server token
+      ansible.builtin.command: >
+        consul acl token create
+        -description "Token for Nomad servers"
+        -policy-name nomad-server
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: server_token_output
+      changed_when: true
+
+    - name: Parse Nomad server token SecretID
+      ansible.builtin.set_fact:
+        nomad_server_token: "{{ server_token_output.stdout | regex_search('SecretID:\\s+([a-f0-9-]+)', '\\1') | first }}"
+
+    - name: Save Nomad server token locally
+      ansible.builtin.copy:
+        content: |
+          Nomad Server Consul Token
+          =========================
+          {{ server_token_output.stdout }}
+          
+          SecretID (for configuration): {{ nomad_server_token }}
+        dest: "{{ nomad_server_token_file }}"
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+    # Configure Nomad Client Policy
+    - name: Copy Nomad client policy to remote host
+      ansible.builtin.template:
+        src: roles/consul/templates/nomad-client-policy.hcl.j2
+        dest: /tmp/nomad-client-policy.hcl
+        mode: '0644'
+
+    - name: Create Nomad client policy in Consul
+      ansible.builtin.command: >
+        consul acl policy create
+        -name nomad-client
+        -description "Policy for Nomad clients"
+        -rules @/tmp/nomad-client-policy.hcl
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: client_policy_result
+      failed_when: false
+      changed_when: client_policy_result.rc == 0
+
+    - name: Update Nomad client policy if it exists
+      when: client_policy_result.rc != 0 and 'already exists' in client_policy_result.stderr
+      ansible.builtin.command: >
+        consul acl policy update
+        -name nomad-client
+        -rules @/tmp/nomad-client-policy.hcl
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+
+    - name: Create Nomad client token
+      ansible.builtin.command: >
+        consul acl token create
+        -description "Token for Nomad clients"
+        -policy-name nomad-client
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: client_token_output
+      changed_when: true
+
+    - name: Parse Nomad client token SecretID
+      ansible.builtin.set_fact:
+        nomad_client_token: "{{ client_token_output.stdout | regex_search('SecretID:\\s+([a-f0-9-]+)', '\\1') | first }}"
+
+    - name: Save Nomad client token locally
+      ansible.builtin.copy:
+        content: |
+          Nomad Client Consul Token
+          =========================
+          {{ client_token_output.stdout }}
+          
+          SecretID (for configuration): {{ nomad_client_token }}
+        dest: "{{ nomad_client_token_file }}"
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+    # Configure Nomad Workload Policy
+    - name: Copy Nomad workload policy to remote host
+      ansible.builtin.template:
+        src: roles/consul/templates/nomad-workload-policy.hcl.j2
+        dest: /tmp/nomad-workload-policy.hcl
+        mode: '0644'
+
+    - name: Create Nomad workload policy in Consul
+      ansible.builtin.command: >
+        consul acl policy create
+        -name nomad-workload
+        -description "Policy for Nomad workloads with workload identity"
+        -rules @/tmp/nomad-workload-policy.hcl
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: workload_policy_result
+      failed_when: false
+      changed_when: workload_policy_result.rc == 0
+
+    - name: Update Nomad workload policy if it exists
+      when: workload_policy_result.rc != 0 and 'already exists' in workload_policy_result.stderr
+      ansible.builtin.command: >
+        consul acl policy update
+        -name nomad-workload
+        -rules @/tmp/nomad-workload-policy.hcl
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+
+    # Enable Consul JWT auth method for Nomad workload identity
+    - name: Check if JWT auth method exists
+      ansible.builtin.command: >
+        consul acl auth-method read -name nomad-workloads
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: jwt_method_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create JWT auth method for Nomad workload identity
+      when: jwt_method_check.rc != 0
+      ansible.builtin.shell: |
+        consul acl auth-method create \
+          -name nomad-workloads \
+          -type jwt \
+          -description "JWT auth method for Nomad workload identities" \
+          -config '{
+            "JWTValidationPubKeys": ["{{ lookup('file', '/tmp/nomad_jwt_public_key.pem', errors='ignore') | default('') }}"],
+            "BoundAudiences": ["consul.io"],
+            "ClaimMappings": {
+              "nomad_namespace": "nomad_namespace",
+              "nomad_job_id": "nomad_job_id",
+              "nomad_task": "nomad_task"
+            }
+          }'
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: jwt_method_create
+      failed_when: false
+      changed_when: jwt_method_create.rc == 0
+
+    - name: Create binding rule for Nomad workloads
+      when: jwt_method_check.rc != 0
+      ansible.builtin.command: >
+        consul acl binding-rule create
+        -method nomad-workloads
+        -bind-type service
+        -bind-name '${value.nomad_service}'
+        -selector 'value.nomad_service != ""'
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: binding_rule_result
+      failed_when: false
+      changed_when: binding_rule_result.rc == 0
+
+    - name: Cleanup temporary policy files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/nomad-server-policy.hcl
+        - /tmp/nomad-client-policy.hcl
+        - /tmp/nomad-workload-policy.hcl
+
+    - name: Display configuration summary
+      ansible.builtin.debug:
+        msg: |
+          Consul configuration for Nomad completed successfully!
+          
+          Tokens saved to:
+          - Nomad Server Token: {{ nomad_server_token_file }}
+          - Nomad Client Token: {{ nomad_client_token_file }}
+          
+          Next steps:
+          1. Configure Nomad servers with the server token
+          2. Configure Nomad clients with the client token
+          3. Enable workload identity in Nomad configuration
+          4. Restart Nomad services to apply changes
+
+# Made with Bob
