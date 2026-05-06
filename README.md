@@ -189,13 +189,19 @@ cat /tmp/nomad_bootstrap_token.txt
 **Consul:**
 ```bash
 # SSH to a server
-ssh ubuntu@<server-ip>
+ssh -i ../ansible/ssh_key.pem ubuntu@<server-ip>
+
+# Set the bootstrap token for authentication
+export CONSUL_HTTP_TOKEN=$(cat /tmp/consul_bootstrap_secret_id.txt)
 
 # Check cluster members
 consul members
 
 # Check cluster health
 consul operator raft list-peers
+
+# List ACL tokens
+consul acl token list
 ```
 
 **Nomad:**

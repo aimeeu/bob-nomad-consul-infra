@@ -104,13 +104,102 @@
       failed_when: false
       changed_when: consul_acl_bootstrap.rc == 0
 
-    - name: Save bootstrap token
+    - name: Parse bootstrap token from output
+      when: consul_acl_bootstrap.rc == 0
+      ansible.builtin.set_fact:
+        consul_bootstrap_token: "{{ consul_acl_bootstrap.stdout | regex_search('SecretID:\\s+([a-f0-9-]+)', '\\1') | first }}"
+
+    - name: Save bootstrap token to local file
       when: consul_acl_bootstrap.rc == 0
       ansible.builtin.copy:
-        content: "{{ consul_acl_bootstrap.stdout }}"
+        content: |
+          Consul Bootstrap Token
+          ======================
+          {{ consul_acl_bootstrap.stdout }}
+          
+          SecretID (for easy access): {{ consul_bootstrap_token }}
         dest: "/tmp/consul_bootstrap_token.txt"
         mode: '0600'
       delegate_to: localhost
       become: false
 
-# Made with Bob
+    - name: Save bootstrap token SecretID only
+      when: consul_acl_bootstrap.rc == 0
+      ansible.builtin.copy:
+        content: "{{ consul_bootstrap_token }}"
+        dest: "/tmp/consul_bootstrap_secret_id.txt"
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+    - name: Set bootstrap token as fact for all hosts
+      when: consul_acl_bootstrap.rc == 0
+      ansible.builtin.set_fact:
+        consul_bootstrap_token: "{{ consul_bootstrap_token }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['all'] }}"
+
+- name: Read bootstrap token if already exists
+  when:
+    - consul_acl_enabled
+    - inventory_hostname == groups['servers'][0]
+    - consul_acl_bootstrap.rc != 0
+  block:
+    - name: Check if bootstrap token file exists locally
+      ansible.builtin.stat:
+        path: "/tmp/consul_bootstrap_secret_id.txt"
+      register: bootstrap_token_file
+      delegate_to: localhost
+      become: false
+
+    - name: Read existing bootstrap token
+      when: bootstrap_token_file.stat.exists
+      ansible.builtin.slurp:
+        src: "/tmp/consul_bootstrap_secret_id.txt"
+      register: existing_token
+      delegate_to: localhost
+      become: false
+
+    - name: Set bootstrap token from file
+      when: bootstrap_token_file.stat.exists
+      ansible.builtin.set_fact:
+        consul_bootstrap_token: "{{ existing_token.content | b64decode | trim }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['all'] }}"
+
+- name: Delete anonymous token
+  when:
+    - consul_acl_enabled
+    - inventory_hostname == groups['servers'][0]
+    - consul_bootstrap_token is defined
+  block:
+    - name: Get anonymous token accessor ID
+      ansible.builtin.command: >
+        {{ consul_bin_path }} acl token read -id 00000000-0000-0000-0000-000000000002
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: anonymous_token_info
+      failed_when: false
+      changed_when: false
+
+    - name: Delete anonymous token
+      when: anonymous_token_info.rc == 0
+      ansible.builtin.command: >
+        {{ consul_bin_path }} acl token delete -id 00000000-0000-0000-0000-000000000002
+      environment:
+        CONSUL_HTTP_TOKEN: "{{ consul_bootstrap_token }}"
+      register: delete_anonymous_result
+      failed_when: false
+      changed_when: delete_anonymous_result.rc == 0
+
+    - name: Display anonymous token deletion result
+      ansible.builtin.debug:
+        msg: "Anonymous token deleted successfully"
+      when: delete_anonymous_result.changed
+
+    - name: Display message if anonymous token already deleted
+      ansible.builtin.debug:
+        msg: "Anonymous token does not exist or was already deleted"
+      when: anonymous_token_info.rc != 0
