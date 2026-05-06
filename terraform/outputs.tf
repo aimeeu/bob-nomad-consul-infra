@@ -46,7 +46,17 @@ output "nomad_ui_urls" {
 output "ssh_commands" {
   description = "SSH commands to connect to instances"
   value = {
-    servers = [for idx, ip in aws_instance.servers[*].public_ip : "ssh ${var.ssh_user}@${ip}"]
-    clients = [for idx, ip in aws_instance.clients[*].public_ip : "ssh ${var.ssh_user}@${ip}"]
+    servers = [for idx, ip in aws_instance.servers[*].public_ip : "ssh -i ../ansible/ssh_key.pem ${var.ssh_user}@${ip}"]
+    clients = [for idx, ip in aws_instance.clients[*].public_ip : "ssh -i ../ansible/ssh_key.pem ${var.ssh_user}@${ip}"]
   }
+}
+
+output "ssh_private_key_path" {
+  description = "Path to the generated SSH private key"
+  value       = local_sensitive_file.private_key.filename
+}
+
+output "ssh_public_key" {
+  description = "Generated SSH public key"
+  value       = tls_private_key.ssh_key.public_key_openssh
 }

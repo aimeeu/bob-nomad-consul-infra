@@ -64,12 +64,6 @@ variable "client_instance_type" {
   default     = "t3.medium"
 }
 
-variable "ssh_public_key_path" {
-  description = "Path to SSH public key"
-  type        = string
-  default     = "~/.ssh/id_rsa.pub"
-}
-
 variable "ssh_user" {
   description = "SSH user for Ansible"
   type        = string

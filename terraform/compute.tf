@@ -1,13 +1,3 @@
-# SSH Key Pair
-resource "aws_key_pair" "nomad_consul_key" {
-  key_name   = "${var.project_name}-key"
-  public_key = file(var.ssh_public_key_path)
-
-  tags = {
-    Name  = "${var.project_name}-key"
-    Owner = var.owner
-  }
-}
 
 # Data source for Ubuntu AMI
 data "aws_ami" "ubuntu" {
@@ -16,7 +6,7 @@ data "aws_ami" "ubuntu" {
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
 
   filter {
@@ -39,14 +29,11 @@ resource "aws_instance" "servers" {
     volume_type = "gp3"
   }
 
-  user_data = templatefile("${path.module}/user_data.sh", {
-    hostname = "${var.project_name}-server-${count.index + 1}"
-  })
-
   tags = {
-    Name  = "${var.project_name}-server-${count.index + 1}"
-    Owner = var.owner
-    Role  = "server"
+    Name     = "${var.project_name}-server-${count.index + 1}"
+    Owner    = var.owner
+    Role     = "server"
+    Hostname = "${var.project_name}-server-${count.index + 1}"
   }
 }
 
@@ -64,14 +51,11 @@ resource "aws_instance" "clients" {
     volume_type = "gp3"
   }
 
-  user_data = templatefile("${path.module}/user_data.sh", {
-    hostname = "${var.project_name}-client-${count.index + 1}"
-  })
-
   tags = {
-    Name  = "${var.project_name}-client-${count.index + 1}"
-    Owner = var.owner
-    Role  = "client"
+    Name     = "${var.project_name}-client-${count.index + 1}"
+    Owner    = var.owner
+    Role     = "client"
+    Hostname = "${var.project_name}-client-${count.index + 1}"
   }
 }
 

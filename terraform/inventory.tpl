@@ -10,5 +10,5 @@ ${name} ansible_host=${instance.ip} private_ip=${instance.private_ip}
 
 [all:vars]
 ansible_user=${ssh_user}
-ansible_ssh_private_key_file=~/.ssh/id_rsa
+ansible_ssh_private_key_file=ssh_key.pem
 ansible_python_interpreter=/usr/bin/python3
