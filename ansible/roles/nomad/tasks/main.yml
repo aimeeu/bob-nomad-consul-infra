@@ -109,6 +109,13 @@
     - reload systemd
     - restart nomad
 
+- name: Validate nomad configuration
+  become: true
+  ansible.builtin.command: "{{ nomad_bin_path }} agent -config={{ nomad_config_dir }} -dev-connect=false -dry-run"
+  register: nomad_validate
+  changed_when: false
+  failed_when: nomad_validate.rc != 0
+
 - name: Enable and start nomad service
   become: true
   ansible.builtin.systemd:

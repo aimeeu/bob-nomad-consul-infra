@@ -5,7 +5,7 @@ log_level = "{{ consul_log_level }}"
 server = true
 bootstrap_expect = {{ groups['servers'] | length }}
 
-bind_addr = "{{ ansible_default_ipv4.address }}"
+bind_addr = "{{ ansible_facts['default_ipv4']['address'] }}"
 client_addr = "0.0.0.0"
 
 ui_config {

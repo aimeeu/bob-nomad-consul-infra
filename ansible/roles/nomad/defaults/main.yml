@@ -36,7 +36,7 @@ nomad_server_bootstrap_expect: 3
 
 # Nomad client configuration
 nomad_client_enabled: false
-nomad_client_network_interface: "{{ ansible_default_ipv4.interface }}"
+nomad_client_network_interface: "{{ ansible_facts['default_ipv4']['interface'] }}"
 
 # Docker driver configuration
 nomad_docker_enabled: true
