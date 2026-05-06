@@ -1,0 +1,48 @@
+---
+- name: Update AWS Security Group to allow port 3000
+  hosts: localhost
+  gather_facts: no
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1', true) }}"
+    project_name: "{{ lookup('env', 'PROJECT_NAME') | default('nomad-consul', true) }}"
+  
+  tasks:
+    - name: Get security group information
+      amazon.aws.ec2_security_group_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Name": "{{ project_name }}-sg"
+      register: sg_info
+
+    - name: Fail if security group not found
+      ansible.builtin.fail:
+        msg: "Security group {{ project_name }}-sg not found in region {{ aws_region }}"
+      when: sg_info.security_groups | length == 0
+
+    - name: Add ingress rule for port 3000
+      amazon.aws.ec2_security_group:
+        name: "{{ sg_info.security_groups[0].group_name }}"
+        description: "{{ sg_info.security_groups[0].description }}"
+        vpc_id: "{{ sg_info.security_groups[0].vpc_id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            from_port: 3000
+            to_port: 3000
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "Allow HTTP traffic on port 3000"
+        rules_egress: "{{ sg_info.security_groups[0].ip_permissions_egress }}"
+        state: present
+      register: sg_update
+
+    - name: Display security group update result
+      ansible.builtin.debug:
+        msg: "Security group {{ sg_info.security_groups[0].group_name }} updated successfully with port 3000 ingress rule"
+      when: sg_update.changed
+
+    - name: Display message if no changes needed
+      ansible.builtin.debug:
+        msg: "Port 3000 ingress rule already exists in security group {{ sg_info.security_groups[0].group_name }}"
+      when: not sg_update.changed
+
+# Made with Bob
