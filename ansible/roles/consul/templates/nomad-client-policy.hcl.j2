@@ -1,0 +1,22 @@
+# Nomad Client Policy for Consul Integration
+# This policy allows Nomad clients to register services and perform service discovery
+
+# Allow Nomad clients to read agent information
+agent_prefix "" {
+  policy = "read"
+}
+
+# Allow Nomad clients to register and manage services
+service_prefix "" {
+  policy = "write"
+}
+
+# Allow Nomad clients to read node information
+node_prefix "" {
+  policy = "read"
+}
+
+# Allow Nomad clients to read key-value store
+key_prefix "" {
+  policy = "read"
+}

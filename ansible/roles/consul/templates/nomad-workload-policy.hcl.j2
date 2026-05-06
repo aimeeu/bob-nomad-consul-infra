@@ -1,0 +1,27 @@
+# Nomad Workload Identity Policy for Consul
+# This policy is used by Nomad workloads with workload identity enabled
+
+# Allow workloads to register their own services
+service "{{ service_name | default('*') }}" {
+  policy = "write"
+}
+
+# Allow workloads to read service information for service discovery
+service_prefix "" {
+  policy = "read"
+}
+
+# Allow workloads to read node information
+node_prefix "" {
+  policy = "read"
+}
+
+# Allow workloads to read key-value store
+key_prefix "" {
+  policy = "read"
+}
+
+# Allow workloads to use prepared queries
+query_prefix "" {
+  policy = "read"
+}
