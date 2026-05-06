@@ -1,15 +1,100 @@
 ---
+- name: Set hostname from instance tag
+  become: true
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+    use: systemd
+
 - name: Update apt cache
   become: true
   ansible.builtin.apt:
     update_cache: yes
     cache_valid_time: 3600
 
+- name: Upgrade all packages
+  become: true
+  ansible.builtin.apt:
+    upgrade: yes
+    update_cache: yes
+
 - name: Install common packages
   become: true
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
+
+- name: Install Docker prerequisites
+  become: true
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Add Docker GPG key
+  become: true
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+    keyring: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Add Docker repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+
+- name: Install Docker
+  become: true
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Enable and start Docker service
+  become: true
+  ansible.builtin.systemd:
+    name: docker
+    enabled: yes
+    state: started
+
+- name: Create consul user
+  become: true
+  ansible.builtin.user:
+    name: consul
+    system: yes
+    home: /etc/consul.d
+    shell: /bin/false
+    create_home: no
+
+- name: Create Nomad directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/nomad/data
+    - /opt/nomad/plugins
+    - /etc/nomad.d
+
+- name: Create Consul directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0755'
+  loop:
+    - /opt/consul
+    - /etc/consul.d
 
 - name: Disable systemd-resolved to avoid port conflicts with Consul
   become: true

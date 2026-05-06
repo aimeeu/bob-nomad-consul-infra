@@ -1,6 +1,6 @@
 ---
 # Nomad version and installation
-nomad_version: "1.7.2"
+nomad_version: "2.0.0"
 nomad_architecture: "amd64"
 nomad_download_url: "https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_linux_{{ nomad_architecture }}.zip"
 
@@ -44,7 +44,7 @@ nomad_docker_volumes_enabled: true
 nomad_docker_privileged_enabled: false
 
 # CNI plugins
-nomad_cni_plugins_url: "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
+nomad_cni_plugins_url: "https://github.com/containernetworking/plugins/releases/download/v1.9.1/cni-plugins-linux-amd64-v1.9.1.tgz"
 nomad_cni_bin_dir: "/opt/cni/bin"
 
 # Made with Bob

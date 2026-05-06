@@ -1,16 +1,4 @@
 ---
-- name: Create nomad directories
-  become: true
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    owner: "{{ nomad_user }}"
-    group: "{{ nomad_group }}"
-    mode: '0755'
-  loop:
-    - "{{ nomad_config_dir }}"
-    - "{{ nomad_data_dir }}"
-    - "{{ nomad_plugin_dir }}"
 
 - name: Check if nomad is already installed
   ansible.builtin.stat:
