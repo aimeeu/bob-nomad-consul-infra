@@ -64,6 +64,18 @@ variable "client_instance_type" {
   default     = "t3.medium"
 }
 
+variable "ami_owner" {
+  description = "AWS account ID of the AMI owner"
+  type        = string
+  default     = "099720109477" # Canonical
+}
+
+variable "ami_name_filter" {
+  description = "Name filter for AMI selection"
+  type        = string
+  default     = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+}
+
 variable "ssh_user" {
   description = "SSH user for Ansible"
   type        = string
