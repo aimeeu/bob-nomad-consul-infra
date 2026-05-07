@@ -1,3 +1,8 @@
+log_level            = "DEBUG"
+log_include_location = true
+log_file             = "/var/log/nomad.log"
+enable_debug         = true
+
 datacenter = "{{ nomad_datacenter }}"
 region     = "{{ nomad_region }}"
 data_dir   = "{{ nomad_data_dir }}"
@@ -33,18 +38,6 @@ client {
   }
 }
 
-plugin "docker" {
-  config {
-    enabled = {{ nomad_docker_enabled | lower }}
-    
-    volumes {
-      enabled = {{ nomad_docker_volumes_enabled | lower }}
-    }
-
-    allow_privileged = {{ nomad_docker_privileged_enabled | lower }}
-  }
-}
-
 consul {
   address             = "{{ nomad_consul_address }}"
   client_service_name = "{{ nomad_consul_client_service_name }}"
@@ -56,3 +49,4 @@ telemetry {
   publish_allocation_metrics = true
   publish_node_metrics       = true
 }
+

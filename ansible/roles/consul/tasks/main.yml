@@ -118,7 +118,7 @@
           {{ consul_acl_bootstrap.stdout }}
           
           SecretID (for easy access): {{ consul_bootstrap_token }}
-        dest: "/tmp/consul_bootstrap_token.txt"
+        dest: "{{ playbook_dir }}/consul_bootstrap_token.txt"
         mode: '0600'
       delegate_to: localhost
       become: false
@@ -127,10 +127,22 @@
       when: consul_acl_bootstrap.rc == 0
       ansible.builtin.copy:
         content: "{{ consul_bootstrap_token }}"
-        dest: "/tmp/consul_bootstrap_secret_id.txt"
+        dest: "{{ playbook_dir }}/consul_bootstrap_secret_id.txt"
         mode: '0600'
       delegate_to: localhost
       become: false
+
+    - name: Display Consul bootstrap token
+      when: consul_acl_bootstrap.rc == 0
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          CONSUL BOOTSTRAP TOKEN
+          ========================================
+          SecretID: {{ consul_bootstrap_token }}
+          
+          Token saved to: {{ playbook_dir }}/consul_bootstrap_token.txt
+          ========================================
 
     - name: Set bootstrap token as fact for all hosts
       when: consul_acl_bootstrap.rc == 0
@@ -148,7 +160,7 @@
   block:
     - name: Check if bootstrap token file exists locally
       ansible.builtin.stat:
-        path: "/tmp/consul_bootstrap_secret_id.txt"
+        path: "{{ playbook_dir }}/consul_bootstrap_secret_id.txt"
       register: bootstrap_token_file
       delegate_to: localhost
       become: false
@@ -156,7 +168,7 @@
     - name: Read existing bootstrap token
       when: bootstrap_token_file.stat.exists
       ansible.builtin.slurp:
-        src: "/tmp/consul_bootstrap_secret_id.txt"
+        src: "{{ playbook_dir }}/consul_bootstrap_secret_id.txt"
       register: existing_token
       delegate_to: localhost
       become: false

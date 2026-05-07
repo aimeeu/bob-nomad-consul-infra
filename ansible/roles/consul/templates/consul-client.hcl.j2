@@ -4,7 +4,8 @@ log_level = "{{ consul_log_level }}"
 
 server = false
 
-bind_addr = "{{ ansible_facts['default_ipv4']['address'] }}"
+bind_addr = "0.0.0.0"
+advertise_addr = "{{ hostvars[inventory_hostname]['private_ip'] }}"
 client_addr = "0.0.0.0"
 
 {% if consul_encrypt_enable and consul_encrypt_key != "" %}

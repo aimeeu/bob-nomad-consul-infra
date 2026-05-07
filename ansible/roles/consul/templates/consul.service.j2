@@ -5,7 +5,7 @@ Requires=network-online.target
 After=network-online.target
 
 [Service]
-Type=notify
+Type=exec
 User={{ consul_user }}
 Group={{ consul_group }}
 ExecStart={{ consul_bin_path }} agent -config-dir={{ consul_config_dir }}
@@ -13,7 +13,11 @@ ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 KillSignal=SIGTERM
 Restart=on-failure
+RestartSec=2
+StartLimitBurst=3
+StartLimitInterval=10
 LimitNOFILE=65536
+OOMScoreAdjust=-1000
 
 [Install]
 WantedBy=multi-user.target
