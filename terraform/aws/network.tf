@@ -11,7 +11,7 @@ resource "aws_vpc" "nomad_consul_vpc" {
 }
 
 # Internet Gateway
-resource "aws_internet_gateway" "igw" {
+resource "aws_internet_gateway" "nomad_consul_igw" {
   vpc_id = aws_vpc.nomad_consul_vpc.id
 
   tags = {
@@ -20,11 +20,23 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
-# Public Subnet
-resource "aws_subnet" "public_subnet" {
+resource "aws_default_route_table" "nomad_consul_route_table" {
+  default_route_table_id = aws_vpc.nomad_consul_vpc.default_route_table_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.nomad_consul_igw.id
+  }
+
+ tags = {
+    Name  = "${var.project_name}-public-rt"
+    Owner = var.owner
+  }
+}
+resource "aws_subnet" "subnet" {
   vpc_id                  = aws_vpc.nomad_consul_vpc.id
   cidr_block              = var.subnet_cidr
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = true # Need this. If false, output does not print public IP
   availability_zone       = data.aws_availability_zones.available.names[0]
 
   tags = {
@@ -33,28 +45,17 @@ resource "aws_subnet" "public_subnet" {
   }
 }
 
-# Route Table
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.nomad_consul_vpc.id
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = {
-    Name  = "${var.project_name}-public-rt"
-    Owner = var.owner
-  }
+# Data source for availability zones
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
-# Route Table Association
-resource "aws_route_table_association" "public_rta" {
-  subnet_id      = aws_subnet.public_subnet.id
-  route_table_id = aws_route_table.public_rt.id
-}
 
+#-------------------------------------------------------------------------------
 # Security Group
+#-------------------------------------------------------------------------------
+
 resource "aws_security_group" "nomad_consul_sg" {
   name        = "${var.project_name}-sg"
   description = "Security group for Nomad and Consul cluster"
@@ -69,92 +70,25 @@ resource "aws_security_group" "nomad_consul_sg" {
     description = "SSH access"
   }
 
-  # Consul Server RPC
-  ingress {
-    from_port   = 8300
-    to_port     = 8300
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Consul Server RPC"
-  }
-
-  # Consul Serf LAN
-  ingress {
-    from_port   = 8301
-    to_port     = 8301
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Consul Serf LAN TCP"
-  }
-
-  ingress {
-    from_port   = 8301
-    to_port     = 8301
-    protocol    = "udp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Consul Serf LAN UDP"
-  }
-
-  # Consul HTTP API
+# Consul HTTP API and UI
   ingress {
     from_port   = 8500
     to_port     = 8500
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
     description = "Consul HTTP API"
   }
 
-  # Consul DNS
-  ingress {
-    from_port   = 8600
-    to_port     = 8600
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Consul DNS TCP"
-  }
 
-  ingress {
-    from_port   = 8600
-    to_port     = 8600
-    protocol    = "udp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Consul DNS UDP"
-  }
-
-  # Nomad HTTP API
+# Nomad HTTP API and UI
   ingress {
     from_port   = 4646
     to_port     = 4646
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
     description = "Nomad HTTP API"
   }
 
-  # Nomad RPC
-  ingress {
-    from_port   = 4647
-    to_port     = 4647
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Nomad RPC"
-  }
-
-  # Nomad Serf
-  ingress {
-    from_port   = 4648
-    to_port     = 4648
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Nomad Serf TCP"
-  }
-
-  ingress {
-    from_port   = 4648
-    to_port     = 4648
-    protocol    = "udp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Nomad Serf UDP"
-  }
 
   # Allow all internal traffic
   ingress {
@@ -179,9 +113,3 @@ resource "aws_security_group" "nomad_consul_sg" {
     Owner = var.owner
   }
 }
-
-# Data source for availability zones
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-

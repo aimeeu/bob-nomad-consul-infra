@@ -18,12 +18,12 @@ resource "aws_key_pair" "nomad_consul_key" {
 # Save private key locally for Ansible
 resource "local_sensitive_file" "private_key" {
   content         = tls_private_key.ssh_key.private_key_pem
-  filename        = "${path.module}/../ansible/ssh_key.pem"
+  filename        = "${path.module}/../../ansible/ssh_key.pem"
   file_permission = "0600"
 }
 
 # Save public key locally for reference
 resource "local_file" "public_key" {
   content  = tls_private_key.ssh_key.public_key_openssh
-  filename = "${path.module}/../ansible/ssh_key.pub"
+  filename = "${path.module}/../../ansible/ssh_key.pub"
 }

@@ -1,5 +1,5 @@
 # Data source for Ubuntu AMI
-data "aws_ami" "ubuntu" {
+data "aws_ami" "chosen_ami" {
   most_recent = true
   owners      = [var.ami_owner]
 
