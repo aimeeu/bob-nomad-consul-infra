@@ -1,23 +1,5 @@
 
-# Data source for Ubuntu AMI
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = [var.ami_owner]
 
-  filter {
-    name   = "name"
-    values = [var.ami_name_filter]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-}
 
 # Nomad/Consul Server Instances
 resource "aws_instance" "servers" {
@@ -97,5 +79,5 @@ resource "local_file" "ansible_inventory" {
     ssh_user = var.ssh_user
   })
   
-  filename = "${path.module}/../ansible/inventory.ini"
+  filename = "${path.module}/../../ansible/inventory.ini"
 }

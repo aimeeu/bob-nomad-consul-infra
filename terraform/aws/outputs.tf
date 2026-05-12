@@ -1,3 +1,7 @@
+output "ami_id" {
+  value = data.aws_ami.latest.id
+}
+
 output "vpc_id" {
   description = "ID of the VPC"
   value       = aws_vpc.nomad_consul_vpc.id
@@ -60,3 +64,5 @@ output "ssh_public_key" {
   description = "Generated SSH public key"
   value       = tls_private_key.ssh_key.public_key_openssh
 }
+
+

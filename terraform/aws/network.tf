@@ -184,3 +184,4 @@ resource "aws_security_group" "nomad_consul_sg" {
 data "aws_availability_zones" "available" {
   state = "available"
 }
+
