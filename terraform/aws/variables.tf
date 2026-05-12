@@ -1,14 +1,28 @@
+variable "ami_owner" {
+  description = "AWS account ID of the AMI owner"
+  type        = string
+  default     = "099720109477" # Canonical
+}
+
+variable "ami_name_filter" {
+  description = "Name filter for AMI selection"
+  type        = string
+  default     = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+}
+
+variable "ami_architecture" {
+  description = "Architecture of the AMI"
+  type        = string
+  default     = "x86_64"
+}
+
+
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-2"
 }
 
-variable "project_name" {
-  description = "Project name used for resource naming"
-  type        = string
-  default     = "nomad-consul"
-}
 
 variable "owner" {
   description = "Owner tag for resources"
@@ -40,6 +54,12 @@ variable "allowed_ssh_cidr" {
   default     = "0.0.0.0/0"
 }
 
+variable "ssh_user" {
+  description = "SSH user for Ansible"
+  type        = string
+  default     = "ubuntu"
+}
+
 variable "server_count" {
   description = "Number of Nomad/Consul server instances"
   type        = number
@@ -64,20 +84,8 @@ variable "client_instance_type" {
   default     = "t3.medium"
 }
 
-variable "ami_owner" {
-  description = "AWS account ID of the AMI owner"
+variable "project_name" {
+  description = "Project name used for resource naming"
   type        = string
-  default     = "099720109477" # Canonical
-}
-
-variable "ami_name_filter" {
-  description = "Name filter for AMI selection"
-  type        = string
-  default     = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
-}
-
-variable "ssh_user" {
-  description = "SSH user for Ansible"
-  type        = string
-  default     = "ubuntu"
+  default     = "nomad-consul"
 }

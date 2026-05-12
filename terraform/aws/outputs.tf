@@ -1,3 +1,7 @@
+output "ami_id" {
+  value = data.aws_ami.chosen_ami.id
+}
+
 output "vpc_id" {
   description = "ID of the VPC"
   value       = aws_vpc.nomad_consul_vpc.id
@@ -5,7 +9,7 @@ output "vpc_id" {
 
 output "subnet_id" {
   description = "ID of the public subnet"
-  value       = aws_subnet.public_subnet.id
+  value       = aws_subnet.subnet.id
 }
 
 output "security_group_id" {
@@ -46,8 +50,8 @@ output "nomad_ui_urls" {
 output "ssh_commands" {
   description = "SSH commands to connect to instances"
   value = {
-    servers = [for idx, ip in aws_instance.servers[*].public_ip : "ssh -i ../ansible/ssh_key.pem ${var.ssh_user}@${ip}"]
-    clients = [for idx, ip in aws_instance.clients[*].public_ip : "ssh -i ../ansible/ssh_key.pem ${var.ssh_user}@${ip}"]
+    servers = [for idx, ip in aws_instance.servers[*].public_ip : "ssh -o 'IdentitiesOnly yes' -i ../../ansible/ssh_key.pem ${var.ssh_user}@${ip}"]
+    clients = [for idx, ip in aws_instance.clients[*].public_ip : "ssh -o 'IdentitiesOnly yes' -i ../../ansible/ssh_key.pem ${var.ssh_user}@${ip}"]
   }
 }
 
@@ -60,3 +64,5 @@ output "ssh_public_key" {
   description = "Generated SSH public key"
   value       = tls_private_key.ssh_key.public_key_openssh
 }
+
+

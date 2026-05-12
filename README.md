@@ -89,8 +89,17 @@ ansible-playbook -i inventory.ini site.yml
 The playbook will:
 1. Configure Ubuntu and install common packages
 2. Install and configure Consul (servers and clients)
-3. Install and configure Nomad (servers and clients)
-4. Integrate Nomad with Consul
+3. Bootstrap Consul ACL system and save tokens
+4. Install and configure Nomad (servers and clients)
+5. Bootstrap Nomad ACL system and save tokens
+6. Integrate Nomad with Consul
+
+**Important**: Bootstrap tokens will be displayed during playbook execution and saved to:
+- `ansible/consul_bootstrap_token.txt` - Full Consul bootstrap token details
+- `ansible/consul_bootstrap_secret_id.txt` - Consul SecretID only
+- `ansible/nomad_bootstrap_token.txt` - Full Nomad bootstrap token details
+
+**Save these tokens securely!** They provide full administrative access to your Consul and Nomad clusters.
 
 ### 5. Access the UIs
 
@@ -111,6 +120,15 @@ terraform output nomad_ui_urls
 Default ports:
 - Consul UI: `http://<server-ip>:8500`
 - Nomad UI: `http://<server-ip>:4646`
+
+**Authentication**: Both UIs require ACL tokens for access. Use the bootstrap tokens saved in the `ansible/` directory:
+```bash
+# View Consul token
+cat ansible/consul_bootstrap_secret_id.txt
+
+# View Nomad token
+cat ansible/nomad_bootstrap_token.txt
+```
 
 ### 6. SSH Access
 
